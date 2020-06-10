@@ -104,75 +104,77 @@ class Bot {
                         // DEFINED CONNECTION
                         var results = undefined; // container for search results
                         this.player.youtubeSearch(message.content.substring(7, message.content.length), (data, err) => {
-                            results = data;
-                            /* Iterate through YT results and display them in a poll to play the song with the most votes */
-                            message.channel.send({
-                                embed: results.container
-                            });
-                            message.channel.messages.fetch({
-                                limit: 1
-                            }).then(messages => {
-                                /*
-                                 * I coulnd't get the poll reactions to be added to the Embedded message sent by the bot 
-                                 * as the .fetch() always returned me the first to last message 
-                                 * But I managed to get the embedded poll by sending a reply beforehand 
-                                 */
-                                message.reply('Wait for the 5 options to load and then choose your favourite');
-
-                                message.channel.messages.fetch({
-                                    limit: 1
-                                }).then(messages => {
-									var botPoll = messages.array()[0];
-									var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
-                                    botPoll.react(this.reaction_numbers[0]).then(() => botPoll.react(this.reaction_numbers[1]).then(() => botPoll.react(this.reaction_numbers[2]).then(() => botPoll.react(this.reaction_numbers[3]).then(() => botPoll.react(this.reaction_numbers[4]).then(() => {
-										const collectFor = 7000; // amount of time to collect for in milliseconds
-										const filter = (reaction) => {
-											return this.reaction_numbers.includes(reaction.emoji.name);
-										}; // gathering all reactions which depict digits 0 -> 4
-										const collector = botPoll.createReactionCollector(filter, {
-											time: collectFor
-										});
-                                        collector.on('collect', (reaction) => {
-                                            if (reaction.emoji.name === this.reaction_numbers[0]) {
-                                                votes[0] += 1;
-                                            } else if (reaction.emoji.name === this.reaction_numbers[1]) {
-                                                votes[1] += 1;
-                                            } else if (reaction.emoji.name === this.reaction_numbers[2]) {
-                                                votes[2] += 1;
-                                            } else if (reaction.emoji.name === this.reaction_numbers[3]) {
-                                                votes[3] += 1;
-                                            } else if (reaction.emoji.name === this.reaction_numbers[4]) {
-                                                votes[4] += 1;
-											}
-											else {
-												console.log(`Reacted with ${reaction.emoji}`);
-											}
-                                        });
-                                        collector.on('end', collected => {
-                                            console.log(votes);
-                                            /* Get the most voted option */
-                                            var maxVotedOption = 0,
-                                                maxVotes = 1;
-                                            for (var index = 0; index < votes.length; index++) {
-                                                if (votes[index] > maxVotes) {
-                                                    maxVotedOption = index;
-                                                    maxVotes = votes[index];
-                                                }
-                                            }
-                                            /* Access & Play the video with the ID of the most voted option */
-                                            const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
-                                                filter: 'audioonly'
-                                            });
-                                            this.dispatcher = this.connection.play(stream);
-                                            this.dispatcher.on('finish', () => {
-                                                console.log(results.values[maxVotedOption]['playlistID'])
-                                                // this.connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
-                                            });
-                                            this.dispatcher.on('error', console.error);
-                                        });
-                                    })))));
-                                });
-                            });
+							if (!err) {
+								results = data;
+								/* Iterate through YT results and display them in a poll to play the song with the most votes */
+								message.channel.send({
+									embed: results.container
+								});
+								message.channel.messages.fetch({
+									limit: 1
+								}).then(messages => {
+									/*
+									 * I coulnd't get the poll reactions to be added to the Embedded message sent by the bot 
+									 * as the .fetch() always returned me the first to last message 
+									 * But I managed to get the embedded poll by sending a reply beforehand 
+									 */
+									message.reply('Wait for the 5 options to load and then choose your favourite');
+	
+									message.channel.messages.fetch({
+										limit: 1
+									}).then(messages => {
+										var botPoll = messages.array()[0];
+										var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
+										botPoll.react(this.reaction_numbers[0]).then(() => botPoll.react(this.reaction_numbers[1]).then(() => botPoll.react(this.reaction_numbers[2]).then(() => botPoll.react(this.reaction_numbers[3]).then(() => botPoll.react(this.reaction_numbers[4]).then(() => {
+											const collectFor = 5000; // amount of time to collect for in milliseconds
+											const filter = (reaction) => {
+												return this.reaction_numbers.includes(reaction.emoji.name);
+											}; // gathering all reactions which depict digits 0 -> 4
+											const collector = botPoll.createReactionCollector(filter, {
+												time: collectFor
+											});
+											collector.on('collect', (reaction) => {
+												if (reaction.emoji.name === this.reaction_numbers[0]) {
+													votes[0] += 1;
+												} else if (reaction.emoji.name === this.reaction_numbers[1]) {
+													votes[1] += 1;
+												} else if (reaction.emoji.name === this.reaction_numbers[2]) {
+													votes[2] += 1;
+												} else if (reaction.emoji.name === this.reaction_numbers[3]) {
+													votes[3] += 1;
+												} else if (reaction.emoji.name === this.reaction_numbers[4]) {
+													votes[4] += 1;
+												}
+												else {
+													console.log(`Reacted with ${reaction.emoji}`);
+												}
+											});
+											collector.on('end', collected => {
+												console.log(votes);
+												/* Get the most voted option */
+												var maxVotedOption = 0,
+													maxVotes = 1;
+												for (var index = 0; index < votes.length; index++) {
+													if (votes[index] > maxVotes) {
+														maxVotedOption = index;
+														maxVotes = votes[index];
+													}
+												}
+												/* Access & Play the video with the ID of the most voted option */
+												const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
+													filter: 'audioonly'
+												});
+												this.dispatcher = this.connection.play(stream);
+												this.dispatcher.on('finish', () => {
+													console.log(results.values[maxVotedOption]['playlistID'])
+													// this.connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
+												});
+												this.dispatcher.on('error', console.error);
+											});
+										})))));
+									});
+								});
+							}
                         });
                     } else {
                         // UNDEFINED CONNECTION

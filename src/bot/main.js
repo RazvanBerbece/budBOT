@@ -9,4 +9,4 @@ const Bot = require('./classes/bot.js');
 const budBOT = new Bot(process.env.BOT_TOKEN);
 budBOT.testBotConnection();
 budBOT.thisStrainAPICall();
-budBOT.VoiceChannel();		
+budBOT.VoiceChannel();

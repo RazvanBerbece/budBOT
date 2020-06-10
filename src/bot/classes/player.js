@@ -17,7 +17,6 @@ const Embedded = require('./Embeds/embed.js');
 
     /* YouTube Search query using a given string, called inside function below and returns an embedded container of results */
     youtubeSearch(query, callback) {
-        var resultsDictionary = {};
         this.youtube.search.list({
             part: 'id,snippet',
             q: query,
@@ -26,9 +25,10 @@ const Embedded = require('./Embeds/embed.js');
         }, function (err, response) {
             if (err) {
                 console.log(`err = ${err}`);
-                return;
+                return callback(null, true);
             }
             var index = 0;
+            var resultsDictionary = {};
             for(var i in response.data.items) {
                 const item = response.data.items[i];
                 var thumbnail = undefined;
