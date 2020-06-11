@@ -11,12 +11,13 @@ const Embedded = require('./Embeds/embed.js');
     constructor(token) {
         this.searchOptions = {
             maxResults: 5,
-            key: token
+            key: token,
+            type: 'video,channel,playlist'
         }
     }
 
     /* YouTube Search query using a given string, called inside function below and returns an embedded container of results */
-    youtubeSearch(query, callback) {
+    youtubeSearch(query, callback) {    
         search(query, this.searchOptions, function(err, results) {
             if (err) {
                 return callback(err, null);
@@ -25,12 +26,11 @@ const Embedded = require('./Embeds/embed.js');
             var resultsDictionary = {};
             for(var i in results) {
                 const item = results[i];
-                var thumbnail = item.thumbnails.default[0];
                 resultsDictionary[index] = {
-                    'title': item.title,
+                    'title': item.title ? item.title : 'Title not available.',
                     'id': item.id,
-                    'desc': item.description,
-                    'thumbnail': thumbnail,
+                    'desc': item.description ? item.description : 'Description not available.',
+                    'thumbnail': item.thumbnails.default.url,
                     'playlistID': undefined
                 }
                 index += 1;

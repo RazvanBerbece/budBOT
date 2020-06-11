@@ -3,6 +3,7 @@ const Discord = require('Discord.js'); // superclass for Discord.js API
 const APIClient = require('./client.js');
 const Player = require('./player.js');
 const ytdl = require('ytdl-core');
+const nowPlayingEmbed = require('./Embeds/playing.js');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -25,11 +26,11 @@ class Bot {
             this.client.user.setActivity('people blazin up yo', {
                 type: 'WATCHING'
             });
-		});
-		
-		/* Player Variables */
-		this.connection = undefined;
-		this.dispatcher = undefined;
+        });
+
+        /* Media Player Variables */
+        this.checkConnection = null;
+        this.dispatcher = null;
 
     }
 
@@ -38,7 +39,6 @@ class Bot {
         this.client.on('message', message => {
             if (message.content === 'ping') {
                 message.reply('pong');
-                console.log('Bot up and running !');
             }
         });
     }
@@ -85,22 +85,17 @@ class Bot {
 
     /* Joins the current Voice Channel to get a Voice Connection & Proccesses other Voice Channel commands */
     VoiceChannel() {
-        this.client.on('message', async message => {
+        this.client.on('message', message => {
             if (message.content.startsWith('+$')) {
                 if (message.content.startsWith('haos', 2)) { // budBOT joins the Voice Channel
-                    if (!message.guild) {
-                        return;
-                    } // Voice Chat Rooms only work in guilds
-                    else {
-                        if (message.member.voice.channel) {
-							this.connection = await message.member.voice.channel.join() // Join current channel
-                        } else {
-                            message.reply('I need to join a voice channel first !')
+                    this.joinVoiceChannel(message, (err, connection) => {
+                        if (!err) {
+                            this.checkConnection = connection;
                         }
-                    }
+                    });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.connection !== 'undefined') {
+                    if (typeof this.checkConnection !== 'undefined') { var _self = this;
                         // DEFINED CONNECTION
                         this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
                             if (err) {
@@ -140,7 +135,6 @@ class Bot {
                                         }
                                     });
                                     collector.on('end', collected => {
-                                        console.log(collected);
                                         /* Get the most voted option */
                                         var maxVotedOption = 0,
                                             maxVotes = 1;
@@ -150,17 +144,27 @@ class Bot {
                                                 maxVotes = votes[index];
                                             }
                                         }
-										/* Access & Play the video with the ID of the most voted option */
-										message.reply(`playing ${results.values[maxVotedOption]['title']} ...`);
-                                        const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
-                                            filter: 'audioonly'
-                                        });
-                                        this.dispatcher = this.connection.play(stream);
-                                        this.dispatcher.on('finish', () => {
-                                            console.log(results.values[maxVotedOption]['playlistID'])
-                                            // this.connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
-                                        });
-                                        this.dispatcher.on('error', console.error);
+                                        /* 
+                                         * GET A NEW VOICE CONNECTION
+                                         * currently, due to strange Promises behaviour, I have to do this
+                                         * because I couldn't get the connection saved in a Bot variable
+                                         */
+                                        message.member.voice.channel.join()
+                                            .then(connection => {
+                                                /* Access & Play the video with the ID of the most voted option */
+                                                const nowPlaying = new nowPlayingEmbed(results.values[maxVotedOption]['title'], results.values[maxVotedOption]['thumbnail'], results.values[maxVotedOption]['desc']);
+                                                message.channel.send({ embed: nowPlaying.container });
+                                                const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
+                                                    quality: 'highestaudio'
+                                                });
+                                                const dispatcher = connection.play(stream);
+                                                _self.dispatcher = dispatcher;
+                                                dispatcher.on('finish', () => {
+                                                    console.log(results.values[maxVotedOption]['playlistID'])
+                                                    // connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
+                                                });
+                                                dispatcher.on('error', console.error);
+                                            });
                                     });
                                 });
                             }
@@ -170,25 +174,67 @@ class Bot {
                         message.reply('I have not joined your voice channel yet... HINT: +$haos');
                     }
                 }
-				if (message.content.startsWith('stop', 2)) { // ends bot stream
-					if (typeof this.dispatcher !== 'undefined') {
-                    	this.dispatcher.destroy();
-						message.reply('Queue cleared successfully bruv');
-					} else {
-						message.reply('Queue is already clear boss');
-					}
+                if (message.content.startsWith('stop', 2)) { // stops the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.destroy();
+                        message.reply('Queue cleared successfully bruv');
+                    } else {
+                        message.reply('Queue is already clear boss');
+                    }
+                }
+                if (message.content.startsWith('pause', 2)) { // pauses the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.pause();
+                        message.reply('Queue paused bruv');
+                    } else {
+                        message.reply('Queue is already paused boss');
+                    }
+                }
+                if (message.content.startsWith('resume', 2)) { // pauses the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.resume();
+                        message.reply('Queue resumed');
+                    } else {
+                        message.reply('Queue is already playing boss');
+                    }
                 }
             }
         });
     }
 
     /* OTHER HELPER FUNCTIONS */
-    attachIsImage(attach) { // Checks if the image is a .png or .jpg/.jpeg
+    /* Checks if the image is a .png or .jpg/.jpeg */
+    attachIsImage(attach) {
         var url = attach.url;
         if ((url.indexOf("png", url.length - "png".length) !== -1) || (url.indexOf("jpg", url.length - "jpg".length) !== -1)) {
             return true;
         }
         return false;
+    }
+
+    joinVoiceChannel(message, callback) {
+        if (!message.guild) {
+            return;
+        } // budBOT media options only work in guilds
+        else {
+            if (message.member.voice.channel) {
+                message.member.voice.channel.join()
+                    .then(connection => {
+                        return callback(false, connection);
+                    })
+                    .catch(console.log);
+            } else {
+                message.reply('I need to join a channel first !')
+                return callback(true, null);
+            }
+        }
+    }
+
+    /* Runs all bot command listening functions */
+    runBot() {
+        this.testBotConnection();
+        this.thisStrainAPICall();
+        this.VoiceChannel();
     }
 
 }
