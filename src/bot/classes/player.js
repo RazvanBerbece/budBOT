@@ -1,4 +1,4 @@
-const {google} = require('googleapis');
+var search = require('youtube-search');
 const Embedded = require('./Embeds/embed.js');
 
 /**
@@ -9,45 +9,34 @@ const Embedded = require('./Embeds/embed.js');
 
     /* Constructor holding AUTH & Version params */
     constructor(token) {
-        this.youtube = google.youtube({ // Init Youtube API V3 as well
-            version: 'v3',
-            auth: token
-        });
+        this.searchOptions = {
+            maxResults: 5,
+            key: token,
+            type: 'video,channel,playlist'
+        }
     }
 
     /* YouTube Search query using a given string, called inside function below and returns an embedded container of results */
-    youtubeSearch(query, callback) {
-        this.youtube.search.list({
-            part: 'id,snippet',
-            q: query,
-            maxResults: 5,
-            type: 'video'
-        }, function (err, response) {
+    youtubeSearch(query, callback) {    
+        search(query, this.searchOptions, function(err, results) {
             if (err) {
-                console.log(`err = ${err}`);
-                return callback(null, true);
+                return callback(err, null);
             }
             var index = 0;
             var resultsDictionary = {};
-            for(var i in response.data.items) {
-                const item = response.data.items[i];
-                var thumbnail = undefined;
-                const playlistId = item.id.playlistId;
-                for(var key in item.snippet.thumbnails) { // Get only first thumbnail of the video
-                    thumbnail = item.snippet.thumbnails[key].url;
-                    break;
-                }
+            for(var i in results) {
+                const item = results[i];
                 resultsDictionary[index] = {
-                    'title': item.snippet.title,
-                    'id': item.id.videoId,
-                    'desc': item.snippet.description,
-                    'thumbnail': thumbnail,
-                    'playlistID': playlistId
+                    'title': item.title ? item.title : 'Title not available.',
+                    'id': item.id,
+                    'desc': item.description ? item.description : 'Description not available.',
+                    'thumbnail': item.thumbnails.default.url,
+                    'playlistID': undefined
                 }
                 index += 1;
             }
             const embedded = new Embedded(resultsDictionary);
-            return callback(embedded, false); // (data, err) 
+            return callback(false, embedded);
         });
     }
 

@@ -3,6 +3,7 @@ const Discord = require('Discord.js'); // superclass for Discord.js API
 const APIClient = require('./client.js');
 const Player = require('./player.js');
 const ytdl = require('ytdl-core');
+const nowPlayingEmbed = require('./Embeds/playing.js');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -15,10 +16,7 @@ class Bot {
 
         /* Local classes helpers init */
         this.player = new Player(process.env.YT_TOKEN); // manages YT queries
-		this.apiClient = new APIClient('http://0.0.0.0:5000/'); // makes API calls to thisStrain for a specific function
-		this.reaction_numbers = [
-			"\u0030\u20E3","\u0031\u20E3","\u0032\u20E3","\u0033\u20E3","\u0034\u20E3","\u0035\u20E3", "\u0036\u20E3","\u0037\u20E3","\u0038\u20E3","\u0039\u20E3"
-		]; // Used for polls (emojis depicting digits)
+        this.apiClient = new APIClient('http://0.0.0.0:5000/'); // makes API calls to thisStrain for a specific function
 
         /* Discord API related */
         this.client = new Discord.Client();
@@ -30,6 +28,11 @@ class Bot {
             });
         });
 
+        /* Media Player Variables */
+        this.checkConnection = null;
+        this.dispatcher = null;
+        this.Queue = [];
+
     }
 
     /* Tests whether the bot is listening for messages by sending a PING and expecting a PONG */
@@ -37,7 +40,6 @@ class Bot {
         this.client.on('message', message => {
             if (message.content === 'ping') {
                 message.reply('pong');
-                console.log('Bot up and running !');
             }
         });
     }
@@ -83,119 +85,170 @@ class Bot {
     }
 
     /* Joins the current Voice Channel to get a Voice Connection & Proccesses other Voice Channel commands */
-    async VoiceChannel() {
-        this.client.on('message', async message => {
+    VoiceChannel() {
+        this.client.on('message', message => {
             if (message.content.startsWith('+$')) {
                 if (message.content.startsWith('haos', 2)) { // budBOT joins the Voice Channel
-                    if (!message.guild) {
-                        return;
-                    } // Voice Chat Rooms only work in guilds
-                    else {
-                        if (message.member.voice.channel) {
-                            this.connection = await message.member.voice.channel.join(); // Join current channel
-                            this.dispatcher = undefined;
-                        } else {
-                            message.reply('I need to join a voice channel first !')
+                    this.joinVoiceChannel(message, (err, connection) => {
+                        if (!err) {
+                            this.checkConnection = connection;
                         }
-                    }
+                    });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.connection !== 'undefined') {
+                    if (typeof this.checkConnection !== 'undefined') {
+                        var _self = this; // BEFORE LOSING ACCESS TO 'THIS' OF CLASS
                         // DEFINED CONNECTION
-                        var results = undefined; // container for search results
-                        this.player.youtubeSearch(message.content.substring(7, message.content.length), (data, err) => {
-							if (!err) {
-								results = data;
-								/* Iterate through YT results and display them in a poll to play the song with the most votes */
-								message.channel.send({
-									embed: results.container
-								});
-								message.channel.messages.fetch({
-									limit: 1
-								}).then(messages => {
-									/*
-									 * I coulnd't get the poll reactions to be added to the Embedded message sent by the bot 
-									 * as the .fetch() always returned me the first to last message 
-									 * But I managed to get the embedded poll by sending a reply beforehand 
-									 */
-									message.reply('Wait for the 5 options to load and then choose your favourite');
-	
-									message.channel.messages.fetch({
-										limit: 1
-									}).then(messages => {
-										var botPoll = messages.array()[0];
-										var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
-										botPoll.react(this.reaction_numbers[0]).then(() => botPoll.react(this.reaction_numbers[1]).then(() => botPoll.react(this.reaction_numbers[2]).then(() => botPoll.react(this.reaction_numbers[3]).then(() => botPoll.react(this.reaction_numbers[4]).then(() => {
-											const collectFor = 5000; // amount of time to collect for in milliseconds
-											const filter = (reaction) => {
-												return this.reaction_numbers.includes(reaction.emoji.name);
-											}; // gathering all reactions which depict digits 0 -> 4
-											const collector = botPoll.createReactionCollector(filter, {
-												time: collectFor
-											});
-											collector.on('collect', (reaction) => {
-												if (reaction.emoji.name === this.reaction_numbers[0]) {
-													votes[0] += 1;
-												} else if (reaction.emoji.name === this.reaction_numbers[1]) {
-													votes[1] += 1;
-												} else if (reaction.emoji.name === this.reaction_numbers[2]) {
-													votes[2] += 1;
-												} else if (reaction.emoji.name === this.reaction_numbers[3]) {
-													votes[3] += 1;
-												} else if (reaction.emoji.name === this.reaction_numbers[4]) {
-													votes[4] += 1;
-												}
-												else {
-													console.log(`Reacted with ${reaction.emoji}`);
-												}
-											});
-											collector.on('end', collected => {
-												console.log(votes);
-												/* Get the most voted option */
-												var maxVotedOption = 0,
-													maxVotes = 1;
-												for (var index = 0; index < votes.length; index++) {
-													if (votes[index] > maxVotes) {
-														maxVotedOption = index;
-														maxVotes = votes[index];
-													}
-												}
-												/* Access & Play the video with the ID of the most voted option */
-												const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
-													filter: 'audioonly'
-												});
-												this.dispatcher = this.connection.play(stream);
-												this.dispatcher.on('finish', () => {
-													console.log(results.values[maxVotedOption]['playlistID'])
-													// this.connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
-												});
-												this.dispatcher.on('error', console.error);
-											});
-										})))));
-									});
-								});
-							}
+                        this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
+                            if (err) {
+                                console.log(err);
+                            } else {
+                                message.channel.send({
+                                    embed: results.container
+                                }).then(async function(message) {
+
+                                    await message.react('0️⃣');
+                                    await message.react('1️⃣');
+                                    await message.react('2️⃣');
+                                    await message.react('3️⃣');
+                                    await message.react('4️⃣');
+
+                                    var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
+                                    const collectFor = 5000; // amount of time to collect for in milliseconds
+                                    const filter = (reaction) => {
+                                        return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
+                                    }; // gathering all reactions which depict digits 0 -> 4
+                                    var collector = message.createReactionCollector(filter, {
+                                        time: collectFor
+                                    });
+                                    collector.on('collect', (reaction) => {
+                                        if (reaction.emoji.name === '0️⃣') {
+                                            votes[0] += 1;
+                                        } else if (reaction.emoji.name === '1️⃣') {
+                                            votes[1] += 1;
+                                        } else if (reaction.emoji.name === '2️⃣') {
+                                            votes[2] += 1;
+                                        } else if (reaction.emoji.name === '3️⃣') {
+                                            votes[3] += 1;
+                                        } else if (reaction.emoji.name === '4️⃣') {
+                                            votes[4] += 1;
+                                        } else {
+                                            console.log(`Reacted with ${reaction.emoji}`);
+                                        }
+                                    });
+                                    collector.on('end', collected => {
+                                        /* Get the most voted option */
+                                        var maxVotedOption = 0,
+                                            maxVotes = 1;
+                                        for (var index = 0; index < votes.length; index++) {
+                                            if (votes[index] > maxVotes) {
+                                                maxVotedOption = index;
+                                                maxVotes = votes[index];
+                                            }
+                                        }
+                                        message.member.voice.channel.join()
+                                            .then(connection => {
+                                                _self.Queue.push({
+                                                    'id': results.values[maxVotedOption]['id'],
+                                                    'title': results.values[maxVotedOption]['title'],
+                                                    'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                                    'desc': results.values[maxVotedOption]['desc']
+                                                });
+                                                _self.play(connection, message);
+                                            });
+                                    });
+                                });
+                            }
                         });
                     } else {
                         // UNDEFINED CONNECTION
                         message.reply('I have not joined your voice channel yet... HINT: +$haos');
                     }
                 }
-                if (message.content.startsWith('stop', 2)) { // ends bot stream
-                    this.dispatcher.destroy();
-                    message.reply('Queue cleared successfully bruv');
+                if (message.content.startsWith('stop', 2)) { // stops the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.destroy();
+                        message.reply('Queue cleared successfully bruv');
+                    } else {
+                        message.reply('Queue is already clear boss');
+                    }
+                }
+                if (message.content.startsWith('pause', 2)) { // pauses the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.pause();
+                        message.reply('Queue paused bruv');
+                    } else {
+                        message.reply('Queue is already paused boss');
+                    }
+                }
+                if (message.content.startsWith('resume', 2)) { // resumes the current music stream
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.resume();
+                        message.reply('Queue resumed');
+                    } else {
+                        message.reply('Queue is already playing boss');
+                    }
                 }
             }
         });
     }
 
     /* OTHER HELPER FUNCTIONS */
-    attachIsImage(attach) { // Checks if the image is a .png or .jpg/.jpeg
+    /* Checks if the image is a .png or .jpg/.jpeg */
+    attachIsImage(attach) {
         var url = attach.url;
         if ((url.indexOf("png", url.length - "png".length) !== -1) || (url.indexOf("jpg", url.length - "jpg".length) !== -1)) {
             return true;
         }
         return false;
+    }
+
+    joinVoiceChannel(message, callback) {
+        if (!message.guild) {
+            return;
+        } // budBOT media options only work in guilds
+        else {
+            if (message.member.voice.channel) {
+                message.member.voice.channel.join()
+                    .then(connection => {
+                        return callback(false, connection);
+                    })
+                    .catch(console.log);
+            } else {
+                message.reply('I need to join a channel first !')
+                return callback(true, null);
+            }
+        }
+    }
+
+    /* Wrapper for the connection.play() method */
+    play(connection, message) {
+
+        const nowPlaying = new nowPlayingEmbed(this.Queue[0]['title'], this.Queue[0]['thumbnail'], this.Queue[0]['desc']);
+        message.channel.send({
+            embed: nowPlaying.container
+        });
+
+        const stream = ytdl('https://www.youtube.com/watch?v=' + this.Queue[0]['id'], {
+            quality: 'highestaudio'
+        });
+        this.dispatcher = connection.play(stream);
+
+        this.Queue.shift();
+
+        this.dispatcher.on('finish', () => {
+            if (this.Queue[0]) { 
+                this.play(connection, channel); 
+            }
+        });
+        this.dispatcher.on('error', console.error);
+    }
+
+    /* Runs all bot command listening functions */
+    runBot() {
+        this.testBotConnection();
+        this.thisStrainAPICall();
+        this.VoiceChannel();
     }
 
 }
