@@ -31,6 +31,7 @@ class Bot {
         /* Media Player Variables */
         this.checkConnection = null;
         this.dispatcher = null;
+        this.Queue = [];
 
     }
 
@@ -95,7 +96,8 @@ class Bot {
                     });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.checkConnection !== 'undefined') { var _self = this;
+                    if (typeof this.checkConnection !== 'undefined') {
+                        var _self = this; // BEFORE LOSING ACCESS TO 'THIS' OF CLASS
                         // DEFINED CONNECTION
                         this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
                             if (err) {
@@ -144,26 +146,15 @@ class Bot {
                                                 maxVotes = votes[index];
                                             }
                                         }
-                                        /* 
-                                         * GET A NEW VOICE CONNECTION
-                                         * currently, due to strange Promises behaviour, I have to do this
-                                         * because I couldn't get the connection saved in a Bot variable
-                                         */
                                         message.member.voice.channel.join()
                                             .then(connection => {
-                                                /* Access & Play the video with the ID of the most voted option */
-                                                const nowPlaying = new nowPlayingEmbed(results.values[maxVotedOption]['title'], results.values[maxVotedOption]['thumbnail'], results.values[maxVotedOption]['desc']);
-                                                message.channel.send({ embed: nowPlaying.container });
-                                                const stream = ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['id'], {
-                                                    quality: 'highestaudio'
+                                                _self.Queue.push({
+                                                    'id': results.values[maxVotedOption]['id'],
+                                                    'title': results.values[maxVotedOption]['title'],
+                                                    'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                                    'desc': results.values[maxVotedOption]['desc']
                                                 });
-                                                const dispatcher = connection.play(stream);
-                                                _self.dispatcher = dispatcher;
-                                                dispatcher.on('finish', () => {
-                                                    console.log(results.values[maxVotedOption]['playlistID'])
-                                                    // connection.play(ytdl('https://www.youtube.com/watch?v=' + results.values[maxVotedOption]['playlistID'], { filter: 'audioonly' }));
-                                                });
-                                                dispatcher.on('error', console.error);
+                                                _self.play(connection, message);
                                             });
                                     });
                                 });
@@ -190,7 +181,7 @@ class Bot {
                         message.reply('Queue is already paused boss');
                     }
                 }
-                if (message.content.startsWith('resume', 2)) { // pauses the current music stream
+                if (message.content.startsWith('resume', 2)) { // resumes the current music stream
                     if (typeof this.dispatcher !== 'undefined') {
                         this.dispatcher.resume();
                         message.reply('Queue resumed');
@@ -228,6 +219,29 @@ class Bot {
                 return callback(true, null);
             }
         }
+    }
+
+    /* Wrapper for the connection.play() method */
+    play(connection, message) {
+
+        const nowPlaying = new nowPlayingEmbed(this.Queue[0]['title'], this.Queue[0]['thumbnail'], this.Queue[0]['desc']);
+        message.channel.send({
+            embed: nowPlaying.container
+        });
+
+        const stream = ytdl('https://www.youtube.com/watch?v=' + this.Queue[0]['id'], {
+            quality: 'highestaudio'
+        });
+        this.dispatcher = connection.play(stream);
+
+        this.Queue.shift();
+
+        this.dispatcher.on('finish', () => {
+            if (this.Queue[0]) { 
+                this.play(connection, channel); 
+            }
+        });
+        this.dispatcher.on('error', console.error);
     }
 
     /* Runs all bot command listening functions */
