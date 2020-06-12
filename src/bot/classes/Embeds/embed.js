@@ -7,7 +7,6 @@ class Embedded {
 
     constructor(results) {
         this.valuesDict = results; // also saving the data source out of which the poll is created
-        console.log(this.valuesDict);
         this.embeddedMessage = new Discord.MessageEmbed()
         .setColor('#0099ff')
         .setTitle('Lets light this up yo')

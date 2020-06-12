@@ -4,6 +4,7 @@ const APIClient = require('./client.js');
 const Player = require('./player.js');
 const ytdl = require('ytdl-core');
 const nowPlayingEmbed = require('./Embeds/playing.js');
+const HelpEmbed = require('./Embeds/help.js');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -96,70 +97,133 @@ class Bot {
                     });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.checkConnection !== 'undefined') {
-                        var _self = this; // BEFORE LOSING ACCESS TO 'THIS' OF CLASS
-                        // DEFINED CONNECTION
-                        this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
-                            if (err) {
-                                console.log(err);
-                            } else {
-                                message.channel.send({
-                                    embed: results.container
-                                }).then(async function(message) {
-
-                                    await message.react('0️⃣');
-                                    await message.react('1️⃣');
-                                    await message.react('2️⃣');
-                                    await message.react('3️⃣');
-                                    await message.react('4️⃣');
-
-                                    var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
-                                    const collectFor = 5000; // amount of time to collect for in milliseconds
-                                    const filter = (reaction) => {
-                                        return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
-                                    }; // gathering all reactions which depict digits 0 -> 4
-                                    var collector = message.createReactionCollector(filter, {
-                                        time: collectFor
-                                    });
-                                    collector.on('collect', (reaction) => {
-                                        if (reaction.emoji.name === '0️⃣') {
-                                            votes[0] += 1;
-                                        } else if (reaction.emoji.name === '1️⃣') {
-                                            votes[1] += 1;
-                                        } else if (reaction.emoji.name === '2️⃣') {
-                                            votes[2] += 1;
-                                        } else if (reaction.emoji.name === '3️⃣') {
-                                            votes[3] += 1;
-                                        } else if (reaction.emoji.name === '4️⃣') {
-                                            votes[4] += 1;
-                                        } else {
-                                            console.log(`Reacted with ${reaction.emoji}`);
-                                        }
-                                    });
-                                    collector.on('end', collected => {
-                                        /* Get the most voted option */
-                                        var maxVotedOption = 0,
-                                            maxVotes = 1;
-                                        for (var index = 0; index < votes.length; index++) {
-                                            if (votes[index] > maxVotes) {
-                                                maxVotedOption = index;
-                                                maxVotes = votes[index];
+                    if (typeof this.checkConnection !== 'undefined') {  // DEFINED CONNECTION
+                        if (!this.dispatcher) { // No song playing at the moment
+                            var _self = this; // Keeping access to correct instance of 'this'
+                            this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
+                                if (err) {
+                                    console.log(err);
+                                } else {
+                                    message.channel.send({
+                                        embed: results.container
+                                    }).then(async function(message) {
+    
+                                        await message.react('0️⃣');
+                                        await message.react('1️⃣');
+                                        await message.react('2️⃣');
+                                        await message.react('3️⃣');
+                                        await message.react('4️⃣');
+    
+                                        var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
+                                        const collectFor = 5000; // amount of time to collect for in milliseconds
+                                        const filter = (reaction) => {
+                                            return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
+                                        }; // gathering all reactions which depict digits 0 -> 4
+                                        var collector = message.createReactionCollector(filter, {
+                                            time: collectFor
+                                        });
+                                        collector.on('collect', (reaction) => {
+                                            if (reaction.emoji.name === '0️⃣') {
+                                                votes[0] += 1;
+                                            } else if (reaction.emoji.name === '1️⃣') {
+                                                votes[1] += 1;
+                                            } else if (reaction.emoji.name === '2️⃣') {
+                                                votes[2] += 1;
+                                            } else if (reaction.emoji.name === '3️⃣') {
+                                                votes[3] += 1;
+                                            } else if (reaction.emoji.name === '4️⃣') {
+                                                votes[4] += 1;
+                                            } else {
+                                                console.log(`Reacted with ${reaction.emoji}`);
                                             }
-                                        }
-                                        message.member.voice.channel.join()
-                                            .then(connection => {
-                                                _self.Queue.push({
-                                                    'id': results.values[maxVotedOption]['id'],
-                                                    'title': results.values[maxVotedOption]['title'],
-                                                    'thumbnail': results.values[maxVotedOption]['thumbnail'],
-                                                    'desc': results.values[maxVotedOption]['desc']
-                                                });
-                                                _self.play(connection, message);
+                                        });
+                                        collector.on('end', collected => {
+                                            /* Get the most voted option */
+                                            var maxVotedOption = 0,
+                                                maxVotes = 1;
+                                            for (var index = 0; index < votes.length; index++) {
+                                                if (votes[index] > maxVotes) {
+                                                    maxVotedOption = index;
+                                                    maxVotes = votes[index];
+                                                }
+                                            }
+                                            _self.Queue.push({
+                                                'id': results.values[maxVotedOption]['id'],
+                                                'title': results.values[maxVotedOption]['title'],
+                                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                                'desc': results.values[maxVotedOption]['desc']
                                             });
+                                            _self.joinVoiceChannel(message, (err, connection) => {
+                                                if (!err) {
+                                                    _self.play(connection, message);
+                                                }
+                                            });
+                                        });
                                     });
-                                });
-                            }
-                        });
+                                }
+                            });
+                        }
+                        else {
+                            var _self = this; // Keeping access to correct instance of 'this'
+                            this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
+                                if (err) {
+                                    console.log(err);
+                                } else {
+                                    message.channel.send({
+                                        embed: results.container
+                                    }).then(async function(message) {
+    
+                                        await message.react('0️⃣');
+                                        await message.react('1️⃣');
+                                        await message.react('2️⃣');
+                                        await message.react('3️⃣');
+                                        await message.react('4️⃣');
+    
+                                        var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
+                                        const collectFor = 5000; // amount of time to collect for in milliseconds
+                                        const filter = (reaction) => {
+                                            return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
+                                        }; // gathering all reactions which depict digits 0 -> 4
+                                        var collector = message.createReactionCollector(filter, {
+                                            time: collectFor
+                                        });
+                                        collector.on('collect', (reaction) => {
+                                            if (reaction.emoji.name === '0️⃣') {
+                                                votes[0] += 1;
+                                            } else if (reaction.emoji.name === '1️⃣') {
+                                                votes[1] += 1;
+                                            } else if (reaction.emoji.name === '2️⃣') {
+                                                votes[2] += 1;
+                                            } else if (reaction.emoji.name === '3️⃣') {
+                                                votes[3] += 1;
+                                            } else if (reaction.emoji.name === '4️⃣') {
+                                                votes[4] += 1;
+                                            } else {
+                                                console.log(`Reacted with ${reaction.emoji}`);
+                                            }
+                                        });
+                                        collector.on('end', collected => {
+                                            /* Get the most voted option */
+                                            var maxVotedOption = 0,
+                                                maxVotes = 1;
+                                            for (var index = 0; index < votes.length; index++) {
+                                                if (votes[index] > maxVotes) {
+                                                    maxVotedOption = index;
+                                                    maxVotes = votes[index];
+                                                }
+                                            }
+                                            _self.Queue.push({
+                                                'id': results.values[maxVotedOption]['id'],
+                                                'title': results.values[maxVotedOption]['title'],
+                                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                                'desc': results.values[maxVotedOption]['desc']
+                                            });
+                                            message.channel.send('Song added to queue');
+                                        });
+                                    });
+                                }
+                            });
+                        }
                     } else {
                         // UNDEFINED CONNECTION
                         message.reply('I have not joined your voice channel yet... HINT: +$haos');
@@ -193,6 +257,16 @@ class Bot {
         });
     }
 
+    /* Displays the embedded message containing all the available commands of the budBOT */
+    getHelp() {
+        this.client.on('message', message => {
+            if (message.content === '+$help') {
+                const helperEmbed = new HelpEmbed();
+                message.channel.send({ embed: helperEmbed.container} );
+            }
+        });
+    }
+
     /* OTHER HELPER FUNCTIONS */
     /* Checks if the image is a .png or .jpg/.jpeg */
     attachIsImage(attach) {
@@ -212,10 +286,10 @@ class Bot {
                 message.member.voice.channel.join()
                     .then(connection => {
                         return callback(false, connection);
-                    })
+                    })  
                     .catch(console.log);
             } else {
-                message.reply('I need to join a channel first !')
+                message.reply('I need to join a channel first ! HINT : +$haos');
                 return callback(true, null);
             }
         }
@@ -238,7 +312,10 @@ class Bot {
 
         this.dispatcher.on('finish', () => {
             if (this.Queue[0]) { 
-                this.play(connection, channel); 
+                this.play(connection, message); 
+            }
+            else {
+                this.dispatcher = undefined;
             }
         });
         this.dispatcher.on('error', console.error);
@@ -246,6 +323,7 @@ class Bot {
 
     /* Runs all bot command listening functions */
     runBot() {
+        this.getHelp();
         this.testBotConnection();
         this.thisStrainAPICall();
         this.VoiceChannel();
