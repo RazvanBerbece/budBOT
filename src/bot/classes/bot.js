@@ -253,6 +253,24 @@ class Bot {
                         message.reply('Queue is already playing boss');
                     }
                 }
+                if (message.content.startsWith('skip', 2)) { // skips the current song in the queue
+                    if (typeof this.dispatcher !== 'undefined') {
+                        this.dispatcher.destroy();
+                        this.joinVoiceChannel(message, (err, connection) => {
+                            this.play(connection, message);
+                        });
+                    } else {
+                        message.reply('There is no song to skip');
+                    }
+                }
+                if (message.content.startsWith('upcoming', 2)) { // displays the current music queue
+                    if (!this.Queue.length) {
+                        message.channel.send(`No songs in queue at the moment chief`);
+                    }
+                    for (var index = 0; index < this.Queue.length; index++) {
+                        message.channel.send(`${index+1}) ${this.Queue[index]['title']}`);
+                    }
+                }
             }
         });
     }
@@ -260,7 +278,7 @@ class Bot {
     /* Displays the embedded message containing all the available commands of the budBOT */
     getHelp() {
         this.client.on('message', message => {
-            if (message.content === '+$help') {
+            if (message.content === '+$help' || message.content === '+$') {
                 const helperEmbed = new HelpEmbed();
                 message.channel.send({ embed: helperEmbed.container} );
             }
@@ -289,7 +307,7 @@ class Bot {
                     })  
                     .catch(console.log);
             } else {
-                message.reply('I need to join a channel first ! HINT : +$haos');
+                message.reply('Song queued but I need to join a channel first ! HINT : +$haos');
                 return callback(true, null);
             }
         }
@@ -315,7 +333,7 @@ class Bot {
                 this.play(connection, message); 
             }
             else {
-                this.dispatcher = undefined;
+                this.dispatcher = null;
             }
         });
         this.dispatcher.on('error', console.error);
