@@ -5,6 +5,10 @@ const Player = require('./player.js');
 const ytdl = require('ytdl-core');
 const nowPlayingEmbed = require('./Embeds/playing.js');
 const HelpEmbed = require('./Embeds/help.js');
+const outputHandler = require('./VoiceOutputHandler/writeoutput.js');
+const Silence = require('./VoiceOutputHandler/Silence/silence.js');
+const fs = require('fs');
+const fse = require('fs-extra');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -270,6 +274,49 @@ class Bot {
                     for (var index = 0; index < this.Queue.length; index++) {
                         message.channel.send(`${index+1}) ${this.Queue[index]['title']}`);
                     }
+                }
+                /* Listens to an user and outputs a file with the audio data */
+                if (message.content.startsWith('listen', 2) && message.author.id == '573659533361020941') { // only listen to me for the time being
+                    this.joinVoiceChannel(message, (err, connection) => {
+                        if (!err) {
+                            const receiver = connection.receiver;
+                            connection.play(new Silence(), { type: 'opus' });
+                            connection.on('speaking', (user, speaking) => {
+                                if (speaking && user.id == '573659533361020941') {
+                                    message.channel.send(`Listening to ${user} ...`);
+                                    const audioStream = receiver.createStream(user, { mode: "pcm" });
+                                    const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${Date.now()}.pcm`;
+                                    fse.outputFile(source, '', err => {
+                                        if(err) {
+                                          console.log(err);
+                                        } else {
+                                          console.log('The file was created!');
+                                        }
+                                      })
+                                    var destination = fs.createWriteStream(source);
+                                    audioStream.on('data', (packet) => {
+                                        destination.write(packet);
+                                    });
+                                    audioStream.on('end', () => {
+                                        /*
+                                        * To translate to .WAV :
+                                        * ffmpeg -f s16le -ar 48k -ac 2 -i 573659533361020941_1592079660588.pcm test.wav
+                                        */
+                                        message.channel.send(`${user} stopped speaking`);
+                                        connection.play(audioStream);
+                                        destination.end();
+                                        connection.disconnect();
+                                        return;
+                                    });
+                                }
+                                else { // TEMPORARY : Display a message if any other user tries to use the listen command
+                                    if (user.id != '573659533361020941') {
+                                        message.channel.send('This function can only be used by AntoBc#7863 at the moment, hang on');
+                                    }
+                                }
+                            });
+                        }
+                    });
                 }
             }
         });
