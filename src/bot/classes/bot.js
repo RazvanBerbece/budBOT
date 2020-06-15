@@ -5,10 +5,13 @@ const Player = require('./player.js');
 const ytdl = require('ytdl-core');
 const nowPlayingEmbed = require('./Embeds/playing.js');
 const HelpEmbed = require('./Embeds/help.js');
-const outputHandler = require('./VoiceOutputHandler/writeoutput.js');
 const Silence = require('./VoiceOutputHandler/Silence/silence.js');
 const fs = require('fs');
 const fse = require('fs-extra');
+const wavConverter = require('wav-converter');
+const path = require('path');
+const speechToText = require('./VoiceOutputHandler/speechToTextClient/client.js');
+const SpeechToTextClient = require('./VoiceOutputHandler/speechToTextClient/client.js');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -101,7 +104,7 @@ class Bot {
                     });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.checkConnection !== 'undefined') {  // DEFINED CONNECTION
+                    if (typeof this.checkConnection !== 'undefined') { // DEFINED CONNECTION
                         if (!this.dispatcher) { // No song playing at the moment
                             var _self = this; // Keeping access to correct instance of 'this'
                             this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
@@ -111,13 +114,13 @@ class Bot {
                                     message.channel.send({
                                         embed: results.container
                                     }).then(async function(message) {
-    
+
                                         await message.react('0️⃣');
                                         await message.react('1️⃣');
                                         await message.react('2️⃣');
                                         await message.react('3️⃣');
                                         await message.react('4️⃣');
-    
+
                                         var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
                                         const collectFor = 5000; // amount of time to collect for in milliseconds
                                         const filter = (reaction) => {
@@ -166,8 +169,7 @@ class Bot {
                                     });
                                 }
                             });
-                        }
-                        else {
+                        } else {
                             var _self = this; // Keeping access to correct instance of 'this'
                             this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
                                 if (err) {
@@ -176,13 +178,13 @@ class Bot {
                                     message.channel.send({
                                         embed: results.container
                                     }).then(async function(message) {
-    
+
                                         await message.react('0️⃣');
                                         await message.react('1️⃣');
                                         await message.react('2️⃣');
                                         await message.react('3️⃣');
                                         await message.react('4️⃣');
-    
+
                                         var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
                                         const collectFor = 5000; // amount of time to collect for in milliseconds
                                         const filter = (reaction) => {
@@ -280,38 +282,69 @@ class Bot {
                     this.joinVoiceChannel(message, (err, connection) => {
                         if (!err) {
                             const receiver = connection.receiver;
-                            connection.play(new Silence(), { type: 'opus' });
+                            connection.play(new Silence(), {
+                                type: 'opus'
+                            });
                             connection.on('speaking', (user, speaking) => {
-                                if (speaking && user.id == '573659533361020941') {
-                                    message.channel.send(`Listening to ${user} ...`);
-                                    const audioStream = receiver.createStream(user, { mode: "pcm" });
-                                    const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${Date.now()}.pcm`;
-                                    fse.outputFile(source, '', err => {
-                                        if(err) {
-                                          console.log(err);
-                                        } else {
-                                          console.log('The file was created!');
-                                        }
-                                      })
-                                    var destination = fs.createWriteStream(source);
-                                    audioStream.on('data', (packet) => {
-                                        destination.write(packet);
-                                    });
-                                    audioStream.on('end', () => {
-                                        /*
-                                        * To translate to .WAV :
-                                        * ffmpeg -f s16le -ar 48k -ac 2 -i 573659533361020941_1592079660588.pcm test.wav
-                                        */
-                                        message.channel.send(`${user} stopped speaking`);
-                                        connection.play(audioStream);
-                                        destination.end();
-                                        connection.disconnect();
-                                        return;
-                                    });
-                                }
-                                else { // TEMPORARY : Display a message if any other user tries to use the listen command
-                                    if (user.id != '573659533361020941') {
-                                        message.channel.send('This function can only be used by AntoBc#7863 at the moment, hang on');
+                                if (speaking) {
+                                    if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
+                                        message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
+                                    } else {
+                                        message.channel.send(`Listening to ${user}...`);
+                                        const audioStream = receiver.createStream(user, {
+                                            mode: "pcm"
+                                        });
+                                        const dateNow = Date.now();
+                                        const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.pcm`;
+                                        const wavDestination = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.wav`;
+                                        /* To avoid 'File not found' errors, we make sure to create the source first */
+                                        fse.outputFile(source, '', err => {
+                                            if (err) {
+                                                console.log(err);
+                                            } else {
+                                                console.log('The input file was created!');
+                                            }
+                                        });
+                                        fse.outputFile(wavDestination, '', err => {
+                                            if (err) {
+                                                console.log(err);
+                                            } else {
+                                                console.log('The output file was created!');
+                                            }
+                                        });
+                                        var destination = fs.createWriteStream(source);
+                                        audioStream.on('data', (packet) => {
+                                            destination.write(packet);
+                                        });
+                                        audioStream.on('end', () => {
+                                            message.channel.send(`Analysing speech...`);
+                                            destination.end();
+                                            /* Convert .pcm to .wav */
+                                            var pcmData = fs.readFileSync(path.resolve(__dirname, source));
+                                            var wavData = wavConverter.encodeWav(pcmData, {
+                                                numChannels: 2,
+                                                sampleRate: 48000,
+                                                byteRate: 16
+                                            });
+                                            fs.writeFileSync(path.resolve(__dirname, wavDestination), wavData);
+                                            /* Make API Call to GCloud Speech-To-Text */
+                                            const speechtotext = new SpeechToTextClient(wavDestination);
+                                            speechtotext.getTextTranscript((err, transcription) => {
+                                                if (err) throw err;
+                                                console.log(transcription);
+                                                message.channel.send(`${transcription}`);
+                                                /* Remove all temporary used files from the audiodata/ directory by iterating through all available files */
+                                                fs.readdir(__dirname + `/VoiceOutputHandler/` + `audiodata/`, (err, files) => {
+                                                    if (err) throw err;
+                                                    for (const file of files) {
+                                                        fs.unlink(__dirname + `/VoiceOutputHandler/` + `audiodata/` + file, err => {
+                                                            if (err) throw err;
+                                                        });
+                                                    }
+                                                });
+                                            });
+                                            connection.disconnect();
+                                        });
                                     }
                                 }
                             });
@@ -327,7 +360,9 @@ class Bot {
         this.client.on('message', message => {
             if (message.content === '+$help' || message.content === '+$') {
                 const helperEmbed = new HelpEmbed();
-                message.channel.send({ embed: helperEmbed.container} );
+                message.channel.send({
+                    embed: helperEmbed.container
+                });
             }
         });
     }
@@ -351,7 +386,7 @@ class Bot {
                 message.member.voice.channel.join()
                     .then(connection => {
                         return callback(false, connection);
-                    })  
+                    })
                     .catch(console.log);
             } else {
                 message.reply('Song queued but I need to join a channel first ! HINT : +$haos');
@@ -376,10 +411,9 @@ class Bot {
         this.Queue.shift();
 
         this.dispatcher.on('finish', () => {
-            if (this.Queue[0]) { 
-                this.play(connection, message); 
-            }
-            else {
+            if (this.Queue[0]) {
+                this.play(connection, message);
+            } else {
                 this.dispatcher = null;
             }
         });
