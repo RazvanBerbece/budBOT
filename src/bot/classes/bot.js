@@ -41,6 +41,9 @@ class Bot {
         this.dispatcher = null;
         this.Queue = [];
 
+        /* Voice Commands Variables */
+        this.listener = false;
+
     }
 
     /* Tests whether the bot is listening for messages by sending a PING and expecting a PONG */
@@ -235,8 +238,8 @@ class Bot {
                         message.reply('I have not joined your voice channel yet... HINT: +$haos');
                     }
                 }
-                if (message.content.startsWith('stop', 2)) { // stops the current music stream
-                    if (typeof this.dispatcher !== 'undefined') {
+                if (message.content.startsWith('stop', 2) && message.content.length == 6 ) { // stops the current music stream
+                    if (this.dispatcher) {
                         this.dispatcher.destroy();
                         message.reply('Queue cleared successfully bruv');
                     } else {
@@ -244,7 +247,7 @@ class Bot {
                     }
                 }
                 if (message.content.startsWith('pause', 2)) { // pauses the current music stream
-                    if (typeof this.dispatcher !== 'undefined') {
+                    if (this.dispatcher) {
                         this.dispatcher.pause();
                         message.reply('Queue paused bruv');
                     } else {
@@ -252,7 +255,7 @@ class Bot {
                     }
                 }
                 if (message.content.startsWith('resume', 2)) { // resumes the current music stream
-                    if (typeof this.dispatcher !== 'undefined') {
+                    if (this.dispatcher) {
                         this.dispatcher.resume();
                         message.reply('Queue resumed');
                     } else {
@@ -260,7 +263,7 @@ class Bot {
                     }
                 }
                 if (message.content.startsWith('skip', 2)) { // skips the current song in the queue
-                    if (typeof this.dispatcher !== 'undefined') {
+                    if (this.dispatcher) {
                         this.dispatcher.destroy();
                         this.joinVoiceChannel(message, (err, connection) => {
                             this.play(connection, message);
@@ -281,75 +284,81 @@ class Bot {
                 if (message.content.startsWith('listen', 2) && message.author.id == '573659533361020941') { // only listen to me for the time being
                     this.joinVoiceChannel(message, (err, connection) => {
                         if (!err) {
+                            /* Make changes based on current bot behaviour : listening */
+                            this.listener = true;
+                            this.client.user.setActivity('people blazin up yo', {
+                                type: 'LISTENING'
+                            });
                             const receiver = connection.receiver;
                             connection.play(new Silence(), {
                                 type: 'opus'
                             });
                             connection.on('speaking', (user, speaking) => {
-                                if (speaking) {
-                                    if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
-                                        message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
-                                    } else {
-                                        message.channel.send(`Listening to ${user}...`);
-                                        const audioStream = receiver.createStream(user, {
-                                            mode: "pcm"
-                                        });
-                                        const dateNow = Date.now();
-                                        const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.pcm`;
-                                        const wavDestination = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.wav`;
-                                        /* To avoid 'File not found' errors, we make sure to create the source first */
-                                        fse.outputFile(source, '', err => {
-                                            if (err) {
-                                                console.log(err);
-                                            } else {
-                                                console.log('The input file was created!');
-                                            }
-                                        });
-                                        fse.outputFile(wavDestination, '', err => {
-                                            if (err) {
-                                                console.log(err);
-                                            } else {
-                                                console.log('The output file was created!');
-                                            }
-                                        });
-                                        var destination = fs.createWriteStream(source);
-                                        audioStream.on('data', (packet) => {
-                                            destination.write(packet);
-                                        });
-                                        audioStream.on('end', () => {
-                                            message.channel.send(`Analysing speech...`);
-                                            destination.end();
-                                            /* Convert .pcm to .wav */
-                                            var pcmData = fs.readFileSync(path.resolve(__dirname, source));
-                                            var wavData = wavConverter.encodeWav(pcmData, {
-                                                numChannels: 2,
-                                                sampleRate: 48000,
-                                                byteRate: 16
+                                if (this.listener) {
+                                    if (speaking) {
+                                        if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
+                                            message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
+                                        } else {
+                                            const audioStream = receiver.createStream(user, {
+                                                mode: "pcm"
                                             });
-                                            fs.writeFileSync(path.resolve(__dirname, wavDestination), wavData);
-                                            /* Make API Call to GCloud Speech-To-Text */
-                                            const speechtotext = new SpeechToTextClient(wavDestination);
-                                            speechtotext.getTextTranscript((err, transcription) => {
-                                                if (err) throw err;
-                                                console.log(transcription);
-                                                message.channel.send(`${transcription}`);
-                                                /* Remove all temporary used files from the audiodata/ directory by iterating through all available files */
-                                                fs.readdir(__dirname + `/VoiceOutputHandler/` + `audiodata/`, (err, files) => {
-                                                    if (err) throw err;
-                                                    for (const file of files) {
-                                                        fs.unlink(__dirname + `/VoiceOutputHandler/` + `audiodata/` + file, err => {
-                                                            if (err) throw err;
-                                                        });
+                                            const dateNow = Date.now();
+                                            const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.pcm`;
+                                            const wavDestination = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.wav`;
+                                            /* To avoid 'File not found' errors, we make sure to create the source first */
+                                            fse.outputFile(source, '', err => {
+                                                if (err) {
+                                                    console.log(err);
+                                                } else {
+                                                    console.log('The input file was created!');
+                                                }
+                                            });
+                                            fse.outputFile(wavDestination, '', err => {
+                                                if (err) {
+                                                    console.log(err);
+                                                } else {
+                                                    console.log('The output file was created!');
+                                                }
+                                            });
+                                            var destination = fs.createWriteStream(source);
+                                            audioStream.on('data', (packet) => {
+                                                destination.write(packet);
+                                            });
+                                            audioStream.on('end', () => {
+                                                destination.end();
+                                                /* Convert .pcm to .wav */
+                                                var pcmData = fs.readFileSync(path.resolve(__dirname, source));
+                                                var wavData = wavConverter.encodeWav(pcmData, {
+                                                    numChannels: 2,
+                                                    sampleRate: 48000,
+                                                    byteRate: 16
+                                                });
+                                                fs.writeFileSync(path.resolve(__dirname, wavDestination), wavData);
+                                                /* Make API Call to GCloud Speech-To-Text through the written class */
+                                                const speechtotext = new SpeechToTextClient(wavDestination);
+                                                speechtotext.getTextTranscript((err, transcription) => {
+                                                    if (err) {
+                                                        speechtotext.deleteTempFiles();
+                                                        throw err;
                                                     }
+                                                    console.log(transcription);
+                                                    message.channel.send(`${transcription}`);
+                                                    speechtotext.deleteTempFiles();
                                                 });
                                             });
-                                            connection.disconnect();
-                                        });
+                                        }
                                     }
                                 }
                             });
                         }
                     });
+                }
+                if (message.content.startsWith('stoplistening', 2) && this.listener) {
+                    this.listener = false;
+                    this.client.user.setActivity('people blazin up yo', {
+                        type: 'WATCHING'
+                    });
+                    message.channel.send('Stopped listening');
                 }
             }
         });

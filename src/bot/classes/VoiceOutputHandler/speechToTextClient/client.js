@@ -1,7 +1,6 @@
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 const path = require('path');
-const fse = require('fs-extra');
 
 /**
  * Client which uses the GCloud Speech-To-Text API and returns the result
@@ -31,17 +30,29 @@ class SpeechToTextClient {
             languageCode: 'en-US',
             audioChannelCount: 2
         };
-          const request = {
+        const request = {
             audio: this.readLocalFile(),
             config: config,
         };
         this.client.recognize(request)
-        .then(responses => {
-            const response = responses[0].results[0].alternatives[0].transcript;
-            callback(null, response);
-        })
-        .catch(err => {
-            callback(err, null);
+            .then(responses => {
+                const response = responses[0].results[0].alternatives[0].transcript;
+                callback(null, response);
+            })
+            .catch(err => {
+                callback(err, null);
+            });
+    }
+
+    /* Remove all temporary used files from the audiodata/ directory by iterating through all available files */
+    deleteTempFiles() {
+        fs.readdir(path.join(__dirname, '../audiodata/'), (err, files) => {
+            if (err) throw err;
+            for (const file of files) {
+                fs.unlink(path.join(__dirname, `../audiodata/${file}`), err => {
+                    if (err) throw err;
+                });
+            }
         });
     }
 
