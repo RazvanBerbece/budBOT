@@ -23,6 +23,9 @@ class HelpEmbed {
         .addField('+$thisStrainTest', 'budBOT tests if the thisStrain AI is available for use', false)
         .addField('+$thisStrainClassify + ATTACHMENT <.png/.jpg/.jpeg>', 'budBOT uses the thisStrain AI to classify the strain of cannabis in the given picture', false)
 
+        .addField('+$listen', '(RESTRICTED ACCESS) butBOT listens on the Voice Channel for Voice Commands (play music, send message etc.)', false)
+        .addField('+$stoplistening', '(RESTRICTED ACCESS) budBOT stops listening for Voice Commands', false)
+
     }
 
     get container() {

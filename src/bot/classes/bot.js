@@ -10,8 +10,8 @@ const fs = require('fs');
 const fse = require('fs-extra');
 const wavConverter = require('wav-converter');
 const path = require('path');
-const speechToText = require('./VoiceOutputHandler/speechToTextClient/client.js');
 const SpeechToTextClient = require('./VoiceOutputHandler/speechToTextClient/client.js');
+const VoiceCommandInterpreter = require('./VoiceOutputHandler/VoiceCommand/commands.js');
 
 /**
  * This class wraps all of the bot related methodology (commands, displays, responses)
@@ -282,6 +282,7 @@ class Bot {
                 }
                 /* Listens to an user and outputs a file with the audio data */
                 if (message.content.startsWith('listen', 2) && message.author.id == '573659533361020941') { // only listen to me for the time being
+                    const __self = this;
                     this.joinVoiceChannel(message, (err, connection) => {
                         if (!err) {
                             /* Make changes based on current bot behaviour : listening */
@@ -294,7 +295,7 @@ class Bot {
                                 type: 'opus'
                             });
                             connection.on('speaking', (user, speaking) => {
-                                if (this.listener) {
+                                if (__self.listener) {
                                     if (speaking) {
                                         if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
                                             message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
@@ -326,6 +327,7 @@ class Bot {
                                             });
                                             audioStream.on('end', () => {
                                                 destination.end();
+                                                __self.listener = false;
                                                 /* Convert .pcm to .wav */
                                                 var pcmData = fs.readFileSync(path.resolve(__dirname, source));
                                                 var wavData = wavConverter.encodeWav(pcmData, {
@@ -339,11 +341,16 @@ class Bot {
                                                 speechtotext.getTextTranscript((err, transcription) => {
                                                     if (err) {
                                                         speechtotext.deleteTempFiles();
+                                                        __self.listener = true;
                                                         throw err;
                                                     }
-                                                    console.log(transcription);
-                                                    message.channel.send(`${transcription}`);
-                                                    speechtotext.deleteTempFiles();
+                                                    else {
+                                                        const interpreter = new VoiceCommandInterpreter();
+                                                        console.log(`INPUT => ${transcription}`);
+                                                        console.log(`COMMAND TYPE => ${interpreter.getCommand(transcription)}`);
+                                                        __self.listener = true;
+                                                        speechtotext.deleteTempFiles();
+                                                    }
                                                 });
                                             });
                                         }
