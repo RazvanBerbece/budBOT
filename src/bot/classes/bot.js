@@ -37,7 +37,7 @@ class Bot {
         });
 
         /* Media Player Variables */
-        this.checkConnection = null;
+        this.connection = null;
         this.dispatcher = null;
         this.Queue = [];
 
@@ -102,143 +102,19 @@ class Bot {
                 if (message.content.startsWith('haos', 2)) { // budBOT joins the Voice Channel
                     this.joinVoiceChannel(message, (err, connection) => {
                         if (!err) {
-                            this.checkConnection = connection;
+                            this.connection = connection;
                         }
                     });
                 }
                 if (message.content.startsWith('play', 2)) { // queries YT using the given input after the command
-                    if (typeof this.checkConnection !== 'undefined') { // DEFINED CONNECTION
-                        if (!this.dispatcher) { // No song playing at the moment
-                            var _self = this; // Keeping access to correct instance of 'this'
-                            this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
-                                if (err) {
-                                    console.log(err);
-                                } else {
-                                    message.channel.send({
-                                        embed: results.container
-                                    }).then(async function(message) {
-
-                                        await message.react('0️⃣');
-                                        await message.react('1️⃣');
-                                        await message.react('2️⃣');
-                                        await message.react('3️⃣');
-                                        await message.react('4️⃣');
-
-                                        var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
-                                        const collectFor = 5000; // amount of time to collect for in milliseconds
-                                        const filter = (reaction) => {
-                                            return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
-                                        }; // gathering all reactions which depict digits 0 -> 4
-                                        var collector = message.createReactionCollector(filter, {
-                                            time: collectFor
-                                        });
-                                        collector.on('collect', (reaction) => {
-                                            if (reaction.emoji.name === '0️⃣') {
-                                                votes[0] += 1;
-                                            } else if (reaction.emoji.name === '1️⃣') {
-                                                votes[1] += 1;
-                                            } else if (reaction.emoji.name === '2️⃣') {
-                                                votes[2] += 1;
-                                            } else if (reaction.emoji.name === '3️⃣') {
-                                                votes[3] += 1;
-                                            } else if (reaction.emoji.name === '4️⃣') {
-                                                votes[4] += 1;
-                                            } else {
-                                                console.log(`Reacted with ${reaction.emoji}`);
-                                            }
-                                        });
-                                        collector.on('end', collected => {
-                                            /* Get the most voted option */
-                                            var maxVotedOption = 0,
-                                                maxVotes = 1;
-                                            for (var index = 0; index < votes.length; index++) {
-                                                if (votes[index] > maxVotes) {
-                                                    maxVotedOption = index;
-                                                    maxVotes = votes[index];
-                                                }
-                                            }
-                                            _self.Queue.push({
-                                                'id': results.values[maxVotedOption]['id'],
-                                                'title': results.values[maxVotedOption]['title'],
-                                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
-                                                'desc': results.values[maxVotedOption]['desc']
-                                            });
-                                            _self.joinVoiceChannel(message, (err, connection) => {
-                                                if (!err) {
-                                                    _self.play(connection, message);
-                                                }
-                                            });
-                                        });
-                                    });
-                                }
-                            });
-                        } else {
-                            var _self = this; // Keeping access to correct instance of 'this'
-                            this.player.youtubeSearch(message.content.substring(7, message.content.length), function(err, results) {
-                                if (err) {
-                                    console.log(err);
-                                } else {
-                                    message.channel.send({
-                                        embed: results.container
-                                    }).then(async function(message) {
-
-                                        await message.react('0️⃣');
-                                        await message.react('1️⃣');
-                                        await message.react('2️⃣');
-                                        await message.react('3️⃣');
-                                        await message.react('4️⃣');
-
-                                        var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
-                                        const collectFor = 5000; // amount of time to collect for in milliseconds
-                                        const filter = (reaction) => {
-                                            return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
-                                        }; // gathering all reactions which depict digits 0 -> 4
-                                        var collector = message.createReactionCollector(filter, {
-                                            time: collectFor
-                                        });
-                                        collector.on('collect', (reaction) => {
-                                            if (reaction.emoji.name === '0️⃣') {
-                                                votes[0] += 1;
-                                            } else if (reaction.emoji.name === '1️⃣') {
-                                                votes[1] += 1;
-                                            } else if (reaction.emoji.name === '2️⃣') {
-                                                votes[2] += 1;
-                                            } else if (reaction.emoji.name === '3️⃣') {
-                                                votes[3] += 1;
-                                            } else if (reaction.emoji.name === '4️⃣') {
-                                                votes[4] += 1;
-                                            } else {
-                                                console.log(`Reacted with ${reaction.emoji}`);
-                                            }
-                                        });
-                                        collector.on('end', collected => {
-                                            /* Get the most voted option */
-                                            var maxVotedOption = 0,
-                                                maxVotes = 1;
-                                            for (var index = 0; index < votes.length; index++) {
-                                                if (votes[index] > maxVotes) {
-                                                    maxVotedOption = index;
-                                                    maxVotes = votes[index];
-                                                }
-                                            }
-                                            _self.Queue.push({
-                                                'id': results.values[maxVotedOption]['id'],
-                                                'title': results.values[maxVotedOption]['title'],
-                                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
-                                                'desc': results.values[maxVotedOption]['desc']
-                                            });
-                                            message.channel.send('Song added to queue');
-                                        });
-                                    });
-                                }
-                            });
-                        }
+                    if (typeof this.connection !== 'undefined') { // DEFINED CONNECTION
+                        this.queryAndPlay(message.content.substring(7, message.content.length), message);
                     } else {
                         // UNDEFINED CONNECTION
                         message.reply('I have not joined your voice channel yet... HINT: +$haos');
                     }
                 }
-                if (message.content.startsWith('stop', 2) && message.content.length == 6 ) { // stops the current music stream
+                if (message.content.startsWith('stop', 2) && message.content.length == 6) { // stops the current music stream
                     if (this.dispatcher) {
                         this.dispatcher.destroy();
                         message.reply('Queue cleared successfully bruv');
@@ -282,83 +158,32 @@ class Bot {
                 }
                 /* Listens to an user and outputs a file with the audio data */
                 if (message.content.startsWith('listen', 2) && message.author.id == '573659533361020941') { // only listen to me for the time being
-                    const __self = this;
-                    this.joinVoiceChannel(message, (err, connection) => {
-                        if (!err) {
-                            /* Make changes based on current bot behaviour : listening */
-                            this.listener = true;
-                            this.client.user.setActivity('people blazin up yo', {
-                                type: 'LISTENING'
-                            });
-                            const receiver = connection.receiver;
-                            connection.play(new Silence(), {
-                                type: 'opus'
-                            });
-                            connection.on('speaking', (user, speaking) => {
-                                if (__self.listener) {
-                                    if (speaking) {
-                                        if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
-                                            message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
-                                        } else {
-                                            const audioStream = receiver.createStream(user, {
-                                                mode: "pcm"
-                                            });
-                                            const dateNow = Date.now();
-                                            const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.pcm`;
-                                            const wavDestination = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.wav`;
-                                            /* To avoid 'File not found' errors, we make sure to create the source first */
-                                            fse.outputFile(source, '', err => {
-                                                if (err) {
-                                                    console.log(err);
-                                                } else {
-                                                    console.log('The input file was created!');
-                                                }
-                                            });
-                                            fse.outputFile(wavDestination, '', err => {
-                                                if (err) {
-                                                    console.log(err);
-                                                } else {
-                                                    console.log('The output file was created!');
-                                                }
-                                            });
-                                            var destination = fs.createWriteStream(source);
-                                            audioStream.on('data', (packet) => {
-                                                destination.write(packet);
-                                            });
-                                            audioStream.on('end', () => {
-                                                destination.end();
-                                                __self.listener = false;
-                                                /* Convert .pcm to .wav */
-                                                var pcmData = fs.readFileSync(path.resolve(__dirname, source));
-                                                var wavData = wavConverter.encodeWav(pcmData, {
-                                                    numChannels: 2,
-                                                    sampleRate: 48000,
-                                                    byteRate: 16
-                                                });
-                                                fs.writeFileSync(path.resolve(__dirname, wavDestination), wavData);
-                                                /* Make API Call to GCloud Speech-To-Text through the written class */
-                                                const speechtotext = new SpeechToTextClient(wavDestination);
-                                                speechtotext.getTextTranscript((err, transcription) => {
-                                                    if (err) {
-                                                        speechtotext.deleteTempFiles();
-                                                        __self.listener = true;
-                                                        throw err;
-                                                    }
-                                                    else {
-                                                        const interpreter = new VoiceCommandInterpreter();
-                                                        console.log(`INPUT => ${transcription}`);
-                                                        console.log(`COMMAND TYPE => ${interpreter.getCommand(transcription)}`);
-                                                        __self.listener = true;
-                                                        speechtotext.deleteTempFiles();
-                                                    }
-                                                });
-                                            });
-                                        }
+                    const _self = this;
+                    if (_self.connection) { // budBOT is already connected to a VC
+                        _self.listener = true;
+                        _self.listenCommands(_self.connection, message, (err, transcription) => {
+                            if (!err) {
+                                console.log(`VOICE RESULT : ${transcription}`);
+                                const interpreter = new VoiceCommandInterpreter();
+                                const commandResult = interpreter.getCommand(transcription);
+                                console.log(`COMMAND RESULT : ${commandResult}`);
+                                _self.processVoiceCommand(connection, commandResult, message);
+                            }
+                        });
+                    } else { // needs connection
+                        this.joinVoiceChannel(message, (err, connection) => {
+                            if (!err) {
+                                _self.listener = true;
+                                _self.listenCommands(connection, message, (err, transcription) => {
+                                    if (!err) {
+                                        const interpreter = new VoiceCommandInterpreter();
+                                        const commandResult = interpreter.getCommand(transcription);
+                                        _self.processVoiceCommand(connection, commandResult, message);
                                     }
-                                }
-                            });
-                        }
-                    });
+                                });
+                            }
+                        });
+                    }
                 }
                 if (message.content.startsWith('stoplistening', 2) && this.listener) {
                     this.listener = false;
@@ -411,6 +236,81 @@ class Bot {
         }
     }
 
+    /* Wrapper for the song poll & player */
+    queryAndPlay(query, message) {
+        const _self = this;
+        _self.player.youtubeSearch(query, function(err, results) {
+            if (err) {
+                console.log(err);
+            } else {
+                message.channel.send({
+                    embed: results.container
+                }).then(async function(message) {
+
+                    await message.react('0️⃣');
+                    await message.react('1️⃣');
+                    await message.react('2️⃣');
+                    await message.react('3️⃣');
+                    await message.react('4️⃣');
+
+                    var votes = [1, 1, 1, 1, 1]; // frequency array to get the most voted option
+                    const collectFor = 5000; // amount of time to collect for in milliseconds
+                    const filter = (reaction) => {
+                        return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣'].includes(reaction.emoji.name);
+                    }; // gathering all reactions which depict digits 0 -> 4
+                    var collector = message.createReactionCollector(filter, {
+                        time: collectFor
+                    });
+                    collector.on('collect', (reaction) => {
+                        if (reaction.emoji.name === '0️⃣') {
+                            votes[0] += 1;
+                        } else if (reaction.emoji.name === '1️⃣') {
+                            votes[1] += 1;
+                        } else if (reaction.emoji.name === '2️⃣') {
+                            votes[2] += 1;
+                        } else if (reaction.emoji.name === '3️⃣') {
+                            votes[3] += 1;
+                        } else if (reaction.emoji.name === '4️⃣') {
+                            votes[4] += 1;
+                        }
+                    });
+                    collector.on('end', collected => {
+                        /* Get the most voted option */
+                        var maxVotedOption = 0,
+                            maxVotes = 1;
+                        for (var index = 0; index < votes.length; index++) {
+                            if (votes[index] > maxVotes) {
+                                maxVotedOption = index;
+                                maxVotes = votes[index];
+                            }
+                        }
+                        if (_self.dispatcher) {
+                            _self.Queue.push({
+                                'id': results.values[maxVotedOption]['id'],
+                                'title': results.values[maxVotedOption]['title'],
+                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                'desc': results.values[maxVotedOption]['desc']
+                            });
+                            message.channel.send('Song queued');
+                        } else {
+                            _self.Queue.push({
+                                'id': results.values[maxVotedOption]['id'],
+                                'title': results.values[maxVotedOption]['title'],
+                                'thumbnail': results.values[maxVotedOption]['thumbnail'],
+                                'desc': results.values[maxVotedOption]['desc']
+                            });
+                            _self.joinVoiceChannel(message, (err, connection) => {
+                                if (!err) {
+                                    _self.play(connection, message);
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        });
+    }
+
     /* Wrapper for the connection.play() method */
     play(connection, message) {
 
@@ -434,6 +334,111 @@ class Bot {
             }
         });
         this.dispatcher.on('error', console.error);
+    }
+
+    /**
+     * Listens to Voice Commands after being given access to do this
+     * Returns a callback (error, VoiceCommandToText)
+     */
+    listenCommands(connection, message, callback) {
+        const _self = this;
+        /* Make changes based on current bot behaviour : listening */
+        this.client.user.setActivity('people blazin up yo', {
+            type: 'LISTENING'
+        });
+        const receiver = connection.receiver;
+        connection.play(new Silence(), {
+            type: 'opus'
+        });
+        connection.on('speaking', (user, speaking) => {
+            if (_self.listener) {
+                if (speaking) {
+                    if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
+                        message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
+                    } else {
+                        const audioStream = receiver.createStream(user, {
+                            mode: "pcm"
+                        });
+                        const dateNow = Date.now();
+                        const source = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.pcm`;
+                        const wavDestination = __dirname + `/VoiceOutputHandler/` + `audiodata/` + `${user.id}_${dateNow}.wav`;
+                        /* To avoid 'File not found' errors, we make sure to create the source first */
+                        fse.outputFile(source, '', err => {
+                            if (err) {
+                                console.log(err);
+                            } else {
+                                console.log('The input file was created!');
+                            }
+                        });
+                        fse.outputFile(wavDestination, '', err => {
+                            if (err) {
+                                console.log(err);
+                            } else {
+                                console.log('The output file was created!');
+                            }
+                        });
+                        var destination = fs.createWriteStream(source);
+                        audioStream.on('data', (packet) => {
+                            destination.write(packet);
+                        });
+                        audioStream.on('end', () => {
+                            destination.end();
+                            _self.listener = false; // while processing a voice command, the bot won't be listening
+                            /* Convert .pcm to .wav */
+                            var pcmData = fs.readFileSync(path.resolve(__dirname, source));
+                            var wavData = wavConverter.encodeWav(pcmData, {
+                                numChannels: 2,
+                                sampleRate: 48000,
+                                byteRate: 16
+                            });
+                            fs.writeFileSync(path.resolve(__dirname, wavDestination), wavData);
+                            /* Make API Call to GCloud Speech-To-Text through the written class */
+                            const speechtotext = new SpeechToTextClient(wavDestination);
+                            speechtotext.getTextTranscript((err, transcription) => {
+                                if (err) {
+                                    _self.listener = true;
+                                    return callback(err, null);
+                                }
+                                else {
+                                    _self.listener = true;
+                                    return callback(null, transcription);
+                                }
+                            });
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    processVoiceCommand(connection, commandResult, message) {
+        const _self = this;
+        console.log(`PROCESSING COMMAND ${commandResult}`);
+        if (commandResult[0] != 'default') {
+            switch (commandResult[0]) {
+                case 'PLAY':
+                    message.channel.send(commandResult[1])
+                        .then(function(message) {
+                            _self.listenCommands(connection, message, (err, transcription) => {
+                                if (!err) {
+                                    console.log(`INSIDE PROCESSING : ${transcription}`);
+                                    _self.queryAndPlay(transcription, message);
+                                }
+                            });
+                        });
+                case 'PAUSE':
+                    if (_self.dispatcher) {
+                        _self.dispatcher.pause();
+                    }
+                case 'RESUME':
+                    if (_self.dispatcher) {
+                        _self.dispatcher.resume();
+                    }
+                case 'SENDMESSAGE':
+                    // TODO
+                    message.channel.send(commandResult[1]);
+            }
+        }
     }
 
     /* Runs all bot command listening functions */

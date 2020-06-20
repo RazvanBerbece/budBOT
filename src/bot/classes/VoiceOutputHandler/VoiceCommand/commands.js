@@ -14,13 +14,12 @@ class VoiceCommandInterpreter {
         var command = { // Holds a score which indicates what kind of voice command was input
             'PLAY': 0, 
             'PAUSE': 0, 
-            'STOP': 0, 
+            'RESUME': 0, 
             'SENDMESSAGE': 0 
         };
 
         var inputArray = voiceInput.split(' '); // creating an array of all words in the input 
         for (const word of inputArray) {    
-            console.log(word);
             switch (word) {
                 case 'play':
                 case 'song':
@@ -31,10 +30,10 @@ class VoiceCommandInterpreter {
                 case 'song':
                     command['PAUSE'] += 1;
                     break;
-                case 'stop':
+                case 'resume':
                 case 'song':
-                case 'clear':
-                    command['STOP'] += 1;
+                case 'continue':
+                    command['RESUME'] += 1;
                     break;
                 case 'send':
                 case 'message':
@@ -46,7 +45,10 @@ class VoiceCommandInterpreter {
         return this.getCommandType(command);
     }
 
-    /* Determines if a command is of type PLAY, SENDMESSAGE etc. using the score in the dictionary */
+    /**
+     * Determines if a command is of type PLAY, SENDMESSAGE etc. using the score in the dictionary
+     * Returns a list [COMMANDTYPE, MESSAGETOBESENTBYBOT]
+     */
     getCommandType(command) {
         var maxCommandScore = 0;
         var commandType = 'default';
@@ -56,7 +58,18 @@ class VoiceCommandInterpreter {
                 commandType = key;
             }
         }
-        return commandType;
+        switch (commandType) {
+            case 'PLAY':
+                return ['PLAY', 'What song would you like me to cue man ?'];
+            case 'PAUSE':
+                return ['PAUSE', 'Song paused'];
+            case 'STOP':
+                return ['RESUME', 'Queue resumed'];
+            case 'SENDMESSAGE':
+                return ['SENDMESSAGE', 'What would you like me to send ?'];
+            case 'default':
+                return  ['default', 'The given voice command was not recognised !'];
+        }
     }
 
 }
