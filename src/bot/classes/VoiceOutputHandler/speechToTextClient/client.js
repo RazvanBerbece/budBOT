@@ -37,27 +37,11 @@ class SpeechToTextClient {
         this.client.recognize(request)
             .then(responses => {
                 const response = responses[0].results[0].alternatives[0].transcript;
-                this.deleteTempFiles();
                 callback(null, response);
             })
             .catch(err => {
-                this.deleteTempFiles();
                 callback(err, null);
             });
-    }
-
-    /* Remove all temporary used files from the audiodata/ directory by iterating through all available files */
-    deleteTempFiles() {
-        fs.readdir(path.join(__dirname, '../audiodata/'), (err, files) => {
-            if (err) { console.log(err); }
-            for (const file of files) {
-                fs.unlink(path.join(__dirname, `../audiodata/${file}`), err => {
-                    if (err) {
-                        console.log(err);
-                    }
-                });
-            }
-        });
     }
 
 }
