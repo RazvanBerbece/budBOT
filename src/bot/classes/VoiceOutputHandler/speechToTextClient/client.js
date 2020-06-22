@@ -37,10 +37,10 @@ class SpeechToTextClient {
         this.client.recognize(request)
             .then(responses => {
                 const response = responses[0].results[0].alternatives[0].transcript;
-                callback(null, response);
+                return callback(null, response);
             })
             .catch(err => {
-                callback(err, null);
+                return callback(err, null);
             });
     }
 

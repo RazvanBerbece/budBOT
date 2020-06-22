@@ -44,6 +44,7 @@ class Bot {
 
         /* Voice Commands Variables */
         this.listener = false;
+        this.currentGlobalCommand = '';
 
     }
 
@@ -163,7 +164,7 @@ class Bot {
                     _self.listener = true;
                     if (_self.connection && _self.listener) { // budBOT is already connected to a VC
                         _self.listenCommands(_self.connection, message, (err, transcription) => {
-                            if (!err) {
+                            if (!err && _self.currentGlobalCommand == '') {
                                 console.log(`VOICE RESULT : ${transcription}`);
                                 _self.processVoiceCommand(transcription, message);
                             }
@@ -349,7 +350,7 @@ class Bot {
         });
         connection.on('speaking', (user, speaking) => {
             if (speaking) {
-                if (user.id != '573659533361020941') { // TEMPORARY : ONLY I CAN USE THE LISTENING FUNCTION
+                if (user.id != '573659533361020941') { // TEMPORARY : ONLY LISTEN TO ME
                     message.channel.send('This function can only be used by --AntoBc#7863-- at the moment, hang on');
                 } else {
                     const audioStream = receiver.createStream(user, {
@@ -398,6 +399,9 @@ class Bot {
                                 callback(null, transcription);
                             }
                         });
+                        if (_self.listener) {
+                            _self.listenCommands(_self.connection, message, callback);
+                        }
                     });
                 }
             }
@@ -411,26 +415,29 @@ class Bot {
         if (commandResult[0] != 'default') {
             switch (commandResult[0]) {
                 case 'PLAY':
+                    _self.currentGlobalCommand = 'PLAY';
                     message.channel.send(commandResult[1])
-                        .then(async function(message) {
+                        .then(function(message) {
                             _self.listenCommands(_self.connection, message, (err, transcription) => {
                                 if (!err) {
-                                    console.log(`INSIDE PROCESSING : ${transcription}`);
-                                    _self.queryAndPlay(transcription, message);
-                                }
-                                else {
-                                    console.log(err);
+                                    if (_self.currentGlobalCommand === 'PLAY') {
+                                        console.log(`INSIDE PROCESSING : ${transcription}`);
+                                        _self.currentGlobalCommand = '';
+                                        _self.queryAndPlay(transcription, message);
+                                    }
                                 }
                             });
                             console.log('Processing second instruction');
                         });
                 case 'PAUSE':
                     if (_self.dispatcher) {
+                        message.channel.send(commandResult[1]);
                         _self.dispatcher.pause();
                     }
                 case 'RESUME':
                     if (_self.dispatcher) {
-                        self.dispatcher.resume();
+                        message.channel.send(commandResult[1]);
+                        _self.dispatcher.resume();
                     }
                 case 'SENDMESSAGE':
                     // TODO
