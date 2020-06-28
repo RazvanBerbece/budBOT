@@ -12,7 +12,7 @@ const Embedded = require('./Embeds/embed.js');
         this.searchOptions = {
             maxResults: 5,
             key: token,
-            type: 'video,channel,playlist'
+            type: 'video,playlist'
         }
     }
 
